@@ -48,6 +48,30 @@
 
       // 載入中狀態 (防止重複點擊與網路延遲防呆)
       const [isLoading, setIsLoading] = useState(false);
+      // 新增：初始進入網頁的抓取狀態
+      const [isFetching, setIsFetching] = useState(true);
+
+      // --- 新增：網頁載入時自動抓取雲端資料 (The Magic Hook) ---
+      useEffect(() => {
+        const fetchInitialData = async () => {
+          try {
+            const response = await fetch(WEB_APP_URL);
+            const result = await response.json();
+            if (result.success) {
+              setBalance(result.balance || 0);
+              setTotalIncome(result.totalIncome || 0);
+              setTotalExpense(result.totalExpense || 0);
+              setCloudList(result.recentItems || []);
+            }
+          } catch (error) {
+            console.error("網路連線錯誤，無法載入初始資料", error);
+          } finally {
+            setIsFetching(false); // 關閉同步動畫
+          }
+        };
+        
+        fetchInitialData();
+      }, []); // 空陣列代表「只在網頁打開時執行一次」
 
       // --- 動作邏輯 (Actions) ---
 
@@ -188,7 +212,14 @@
       return (
         <div className="max-w-md mx-auto bg-gray-50 min-h-screen pb-20 shadow-lg">
           {/* --- 1. 水位計儀表板 --- */}
-          <div className="bg-blue-600 text-white p-6 rounded-b-3xl shadow-md">
+          <div className="bg-blue-600 text-white p-6 rounded-b-3xl shadow-md relative">
+            {/* 新增：右上角同步中狀態提示 */}
+            {isFetching && (
+              <div className="absolute top-4 right-4 text-xs font-semibold text-blue-200 animate-pulse bg-blue-700 px-2 py-1 rounded-full">
+                🔄 同步資料中...
+              </div>
+            )}
+            
             <h1 className="text-center text-lg font-bold mb-4 opacity-90">公款家用結餘</h1>
             <div className="flex justify-center items-center mb-6">
               <div className="w-40 h-40 rounded-full border-4 border-blue-400 flex flex-col justify-center items-center bg-blue-700 shadow-inner relative overflow-hidden">
