@@ -21,7 +21,8 @@
   <div id="root"></div>
 
 <script type="text/babel" data-type="module">
-    const { useState, useEffect } = React;
+    const useState = React.useState;
+    const useEffect = React.useEffect;
 
     // 產生假 UUID 的函數
     const generateUUID = () => Math.random().toString(36).substring(2, 15);
