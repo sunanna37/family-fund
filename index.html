@@ -1,2 +1,26 @@
-HTML
-<h1>測試：檔案已成功連結！</h1>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>家用公款記帳系統</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    function App() {
+      return (
+        <div className="p-10 text-center bg-blue-50 min-h-screen">
+          <h1 className="text-3xl font-bold text-blue-800">公款家用系統</h1>
+          <p className="mt-4 text-blue-600">系統框架載入成功！</p>
+        </div>
+      );
+    }
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
