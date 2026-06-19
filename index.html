@@ -2,94 +2,70 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>公款家用系統 v1.0</title>
+  <title>家用公款記帳系統</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-slate-50 text-slate-800">
   <div id="root"></div>
 
   <script>
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
     const e = React.createElement;
-    const generateUUID = () => Math.random().toString(36).substring(2, 15);
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPq8xUK_XrDB_6ggsKE1jMXqNG-DIgFbVojtTcry03PAVErLD8O5-_xoNz_F3Q3d_Bvg/exec";
 
     function App() {
-      const [balance, setBalance] = useState(0);
-      const [totalIncome, setTotalIncome] = useState(0);
-      const [totalExpense, setTotalExpense] = useState(0);
-      const [type, setType] = useState('expense');
-      const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+      const [balance, setBalance] = useState(448739);
+      const [cart, setCart] = useState([]);
+      const [history, setHistory] = useState([
+        { uuid: '1', date: '2026-06-14', item: '素果', income: 0, expense: 480, status: 'Approved' }
+      ]);
       const [item, setItem] = useState('');
       const [amount, setAmount] = useState('');
-      const [stagingList, setStagingList] = useState([]);
-      const [cloudList, setCloudList] = useState([]);
-      const [isLoading, setIsLoading] = useState(false);
-      const [isFetching, setIsFetching] = useState(true);
+      const [type, setType] = useState('expense');
 
-      useEffect(() => {
-        fetch(WEB_APP_URL).then(res => res.json()).then(result => {
-          if (result.success) {
-            setBalance(result.balance || 0);
-            setTotalIncome(result.totalIncome || 0);
-            setTotalExpense(result.totalExpense || 0);
-            const processedItems = (result.recentItems || []).map(i => ({...i, timestamp: new Date(i.timestamp).getTime() || 0}));
-            setCloudList(processedItems);
-          }
-          setIsFetching(false);
-        });
-      }, []);
+      // 模擬新增到暫存區
+      const handleAddToCart = (ev) => {
+        ev.preventDefault();
+        if (!item || !amount) return alert('請填寫完整');
+        setCart([...cart, { id: Math.random().toString(36).substr(2, 9), item, amount: parseInt(amount), type, date: new Date().toISOString().split('T')[0] }]);
+        setItem(''); setAmount('');
+      };
 
-      const canRecall = (ts) => ts && (new Date().getTime() - ts) / 1000 / 60 <= 5;
-
-      // 渲染主畫面
-      return e('div', { className: 'max-w-md mx-auto bg-gray-50 min-h-screen pb-20 shadow-lg' },
-        // 1. 水位計
-        e('div', { className: 'bg-blue-600 text-white p-6 rounded-b-3xl shadow-md' },
-          e('h1', { className: 'text-center text-lg font-bold mb-4' }, '公款家用結餘'),
-          e('div', { className: 'flex justify-center mb-6' },
-            e('div', { className: 'w-40 h-40 rounded-full border-4 border-blue-400 flex flex-col justify-center items-center bg-blue-700' },
-              e('span', { className: 'text-sm opacity-80' }, '當前水位'),
-              e('span', { className: 'text-3xl font-bold' }, `$${balance.toLocaleString()}`)
-            )
-          ),
-          e('div', { className: 'flex justify-between px-4' },
-            e('div', { className: 'text-center' }, e('p', {className: 'text-xs text-blue-200'}, '本期存入'), e('p', {className: 'text-lg font-semibold text-green-300'}, `+$${totalIncome.toLocaleString()}`)),
-            e('div', { className: 'text-center' }, e('p', {className: 'text-xs text-blue-200'}, '本期支出'), e('p', {className: 'text-lg font-semibold text-red-300'}, `-$${totalExpense.toLocaleString()}`))
-          )
+      // 渲染主結構 (使用 React.createElement 取代 JSX)
+      return e('div', { className: 'max-w-6xl mx-auto p-8' },
+        e('header', { className: 'mb-8 border-b pb-4' },
+          e('h1', { className: 'text-3xl font-black' }, '🏠 家用公款記帳系統'),
         ),
-        // 2. 輸入區 (簡單版)
-        e('div', { className: 'p-4' },
-          e('div', { className: 'bg-white rounded-xl shadow p-4 mb-4' },
-            e('div', { className: 'flex bg-gray-100 rounded-lg p-1 mb-4' },
-              e('button', { onClick: () => setType('expense'), className: `flex-1 py-2 rounded ${type === 'expense' ? 'bg-white text-red-500 shadow' : 'text-gray-500'}` }, '支出'),
-              e('button', { onClick: () => setType('income'), className: `flex-1 py-2 rounded ${type === 'income' ? 'bg-white text-green-500 shadow' : 'text-gray-500'}` }, '收入')
-            ),
-            e('input', { type: 'date', className: 'w-full border p-2 mb-2 rounded', value: date, onChange: (ev) => setDate(ev.target.value) }),
-            e('div', { className: 'flex gap-2' },
-              e('input', { className: 'flex-1 border p-2 rounded', placeholder: '項目', value: item, onChange: (ev) => setItem(ev.target.value) }),
-              e('input', { className: 'w-20 border p-2 rounded', type: 'number', placeholder: '金額', value: amount, onChange: (ev) => setAmount(ev.target.value) })
-            ),
-            e('button', { className: 'w-full bg-slate-800 text-white mt-3 py-2 rounded font-bold', onClick: () => {
-              setStagingList([{ id: generateUUID(), date, item, type, amount: parseInt(amount) }, ...stagingList]);
-              setItem(''); setAmount('');
-            }}, '新增至暫存')
+        e('div', { className: 'grid grid-cols-1 lg:grid-cols-3 gap-8' },
+          // 水位計區
+          e('div', { className: 'bg-white p-6 rounded-2xl shadow-sm border' }, 
+            e('h2', { className: 'font-bold mb-4' }, '📊 公款帳戶水位'),
+            e('div', { className: 'text-4xl font-black text-blue-600' }, `$${balance.toLocaleString()}`)
           ),
-          // 3. 歷史紀錄列表
-          e('div', { className: 'bg-white rounded-xl p-4' },
-            cloudList.map(data => e('div', { key: data.uuid, className: 'flex justify-between border-b py-2' },
-              e('div', null, e('p', {className: 'text-xs text-gray-400'}, data.date), e('p', null, data.item)),
-              e('div', {className: 'flex items-center gap-2'}, 
-                e('span', {className: `font-bold ${data.type === 'expense' ? 'text-red-500' : 'text-green-500'}`}, (data.type === 'expense' ? '-' : '+') + '$' + data.amount),
-                canRecall(data.timestamp) ? e('button', { className: 'text-xs bg-gray-200 px-2 rounded', onClick: () => alert('請用 handleRecall 邏輯') }, '撤回') : null
+          // 輸入與清單區
+          e('div', { className: 'lg:col-span-2 flex flex-col gap-6' },
+            e('div', { className: 'bg-white p-6 rounded-2xl shadow-sm border' },
+              e('form', { onSubmit: handleAddToCart, className: 'flex gap-2' },
+                e('input', { className: 'border p-2 rounded flex-1', placeholder: '項目', value: item, onChange: (ev) => setItem(ev.target.value) }),
+                e('input', { className: 'border p-2 w-24 rounded', placeholder: '金額', type: 'number', value: amount, onChange: (ev) => setAmount(ev.target.value) }),
+                e('button', { className: 'bg-slate-800 text-white px-6 rounded font-bold' }, '加入暫存')
               )
-            ))
+            ),
+            // 購物車區
+            e('div', { className: 'bg-amber-50 p-6 rounded-2xl' },
+              e('h2', { className: 'font-bold mb-4' }, `🛒 待送出暫存清單 (${cart.length})`),
+              cart.map(c => e('div', { key: c.id, className: 'flex justify-between border-b py-2' },
+                e('span', null, c.item),
+                e('span', { className: c.type === 'income' ? 'text-green-600' : 'text-red-600' }, c.type === 'income' ? '+' : '-', `$${c.amount}`)
+              )),
+              cart.length > 0 && e('button', { className: 'w-full bg-amber-600 text-white mt-4 py-2 rounded font-bold', onClick: () => alert('請連接您的 GAS URL') }, '確認送出')
+            )
           )
         )
       );
     }
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(e(App));
   </script>
