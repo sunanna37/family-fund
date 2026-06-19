@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>公款家用系統</title>
+  <title>家用公款記帳系統</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,11 +14,33 @@
     const { useState, useEffect } = React;
     const e = React.createElement;
 
+    // 💰 你的 GAS 網址
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPq8xUK_XrDB_6ggsKE1jMXqNG-DIgFbVojtTcry03PAVErLD8O5-_xoNz_F3Q3d_Bvg/exec";
+
     function App() {
-      // 這裡簡單測試畫面是否成功
-      return React.createElement('div', { className: 'p-10 text-center' },
-        React.createElement('h1', { className: 'text-3xl font-bold' }, '系統已成功啟動'),
-        React.createElement('p', { className: 'mt-4' }, '這是一個沒有任何模組衝突的穩定版本。')
+      const [balance, setBalance] = useState(0);
+      const [isFetching, setIsFetching] = useState(true);
+
+      useEffect(() => {
+        fetch(WEB_APP_URL)
+          .then(res => res.json())
+          .then(data => {
+            if(data.success) {
+              setBalance(data.balance);
+            }
+            setIsFetching(false);
+          })
+          .catch(() => setIsFetching(false));
+      }, []);
+
+      // 使用 React.createElement 來渲染畫面 (保證無模組衝突)
+      return e('div', { className: 'p-8 text-center bg-gray-50 min-h-screen' },
+        e('h1', { className: 'text-3xl font-bold text-blue-600' }, '公款家用系統'),
+        e('div', { className: 'mt-6 p-6 bg-white rounded-xl shadow' },
+          e('p', { className: 'text-gray-500' }, '當前水位'),
+          e('h2', { className: 'text-4xl font-black mt-2' }, `$${balance.toLocaleString()}`)
+        ),
+        isFetching ? e('p', { className: 'mt-4 animate-pulse' }, '同步資料中...') : null
       );
     }
 
