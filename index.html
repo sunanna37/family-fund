@@ -60,11 +60,20 @@
               setTotalIncome(result.totalIncome || 0);
               setTotalExpense(result.totalExpense || 0);
               
-              // 💡 修正點 3：防護從後台抓回來的歷史資料，若無時間戳則預設給 0（即不可撤回）
-              const processedItems = (result.recentItems || []).map(item => ({
-                ...item,
-                timestamp: item.timestamp || 0 
-              }));
+              // 💡 核心修正：將後台的人類好讀時間格式安全轉換為純數字毫秒數，防止 canRecall 計算發生 NaN 錯誤導致網頁空白
+              const processedItems = (result.recentItems || []).map(item => {
+                let safeTimestamp = 0;
+                if (item.timestamp) {
+                  const parsed = new Date(item.timestamp).getTime();
+                  if (!isNaN(parsed)) {
+                    safeTimestamp = parsed;
+                  }
+                }
+                return {
+                  ...item,
+                  timestamp: safeTimestamp
+                };
+              });
               setCloudList(processedItems);
             }
           } catch (error) {
@@ -345,7 +354,6 @@
       );
     }
 
-    // 💡 修正點 2：修正了常規 React 掛載語法拼錯
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
