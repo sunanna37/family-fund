@@ -93,11 +93,17 @@
         refreshDataFromServer(); // 撤回後自動更新水位
       };
 
-      // --- 介面渲染結構 (Requirement 1 & 視覺優化) ---
+      // 💡 補回漏掉的撤回時間判斷函數！(5分鐘內才可撤回)
+      const canRecall = (ts) => {
+        if (!ts) return false;
+        return (new Date().getTime() - ts) / 1000 / 60 <= 5;
+      };
+
+      // --- 介面渲染結構 ---
       return e('div', { className: 'max-w-xl mx-auto p-4 pb-20' },
         isLoading && e('div', { className: 'fixed inset-0 bg-white/80 z-50 flex items-center justify-center font-bold text-blue-600 animate-pulse' }, '🔄 同步雲端資料中...'),
         
-        // 1. 擬真水庫水情圖表 (Requirement 1)
+        // 1. 擬真水庫水情圖表
         e('div', { className: 'bg-white p-6 rounded-3xl shadow-xl mb-4 border-2 border-blue-100' },
           e('h1', { className: 'text-center font-bold text-slate-600 mb-6 flex items-center justify-center gap-2' }, 
             e('span', { className: 'text-2xl' }, '💧'), '家用公款即時水情'
@@ -132,7 +138,7 @@
           )
         ),
 
-        // 2. 帳目輸入區 (不衝突穩定版)
+        // 2. 帳目輸入區
         e('div', { className: 'bg-white p-5 rounded-2xl shadow-lg border' },
           e('div', { className: 'flex bg-slate-100 rounded-xl p-1 mb-4' },
             e('button', { onClick: () => setType('expense'), className: `flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${type === 'expense' ? 'bg-white text-rose-600 shadow' : 'text-slate-500'}` }, '支 出'),
@@ -146,7 +152,7 @@
           e('button', { className: 'w-full bg-slate-800 text-white mt-4 py-3 rounded-xl font-bold hover:bg-slate-700 transition active:scale-95', onClick: handleAddStaging }, '加入暫存清單')
         ),
 
-        // 3. 暫存待送區 ( Requirement 2 )
+        // 3. 暫存待送區
         stagingList.length > 0 && e('div', { className: 'bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 mt-4 shadow-inner' },
           e('div', {className: 'flex justify-between items-center mb-3'}, 
             e('h3', { className: 'font-bold text-amber-900' }, `🛒 暫存待送出 (${stagingList.length}筆)`),
@@ -158,7 +164,7 @@
           ))
         ),
 
-        // 4. 近期雲端明細 (Requirement 3: 撤回功能)
+        // 4. 近期雲端明細
         e('div', { className: 'bg-white rounded-2xl p-5 mt-4 border' },
           e('h3', { className: 'font-bold text-slate-600 mb-4' }, '📜 近期雲端存取紀錄 (最近10筆)'),
           cloudList.length === 0 ? e('p', {className: 'text-center text-slate-400 py-6 text-sm'}, '尚無紀錄，點擊上方送出資料') : 
@@ -166,7 +172,6 @@
             e('div', null, e('p', {className: 'text-xs text-slate-400'}, `${data.date} ${data.timestampStr||''}`), e('p', {className:'font-medium text-slate-700 mt-1'}, data.item)),
             e('div', {className: 'flex items-center gap-2.5'}, 
               e('span', {className: `text-lg font-bold ${data.type === 'expense' ? 'text-rose-500' : 'text-emerald-500'}`}, (data.type === 'expense' ? '-' : '+') + '$' + data.amount.toLocaleString()),
-              // 💡 撤回按鈕 (5分鐘防呆，重新整理後失效)
               canRecall(data.timestamp) ? e('button', { className: 'text-xs text-rose-500 bg-rose-50 px-2.5 py-1 rounded hover:bg-rose-100', onClick: () => handleRecall(data) }, '撤回') : null
             )
           ))
