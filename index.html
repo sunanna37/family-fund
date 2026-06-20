@@ -2,17 +2,20 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>公款家用記帳系統 v2.0 - 雲端水情版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公款家用記帳系統 v2.1 - 響應式水情版</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* 數字輸入框隱藏箭頭 */
+    /* 隱藏數字輸入框的上下箭頭，優化手機輸入體驗 */
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    /* 確保手機版面不會左右滑動 */
+    body { overflow-x: hidden; }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen">
   <div id="root"></div>
 
   <script>
@@ -24,7 +27,7 @@
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPq8xUK_XrDB_6ggsKE1jMXqNG-DIgFbVojtTcry03PAVErLD8O5-_xoNz_F3Q3d_Bvg/exec";
     
     // 💡 水庫參數設定
-    const MAX_CAPACITY = 1000000; // 總容量 (滿水位)
+    const MAX_CAPACITY = 500000; // 總容量 (滿水位)
     const WARNING_LIMIT = 100000; // 警告下限 (低水位紅線)
 
     function App() {
@@ -39,7 +42,7 @@
       const [type, setType] = useState('expense');
       const [isLoading, setIsLoading] = useState(true);
 
-      // --- 核心同步邏輯：從雲端重新抓取最新數據 ---
+      // --- 核心同步邏輯 ---
       const refreshDataFromServer = () => {
         setIsLoading(true);
         fetch(WEB_APP_URL).then(res => res.json()).then(data => {
@@ -47,7 +50,6 @@
             setBalance(data.balance || 0);
             setTotalIncome(data.totalIncome || 0);
             setTotalExpense(data.totalExpense || 0);
-            // 處理後台時間格式 (防 Nan 錯誤)
             const processed = (data.recentItems || []).map(i => ({...i, timestamp: new Date(i.timestamp).getTime() || 0}));
             setCloudList(processed);
           }
@@ -58,10 +60,9 @@
         });
       };
 
-      // 網頁初始載入同步一次
       useEffect(() => { refreshDataFromServer(); }, []);
 
-      // 計算水位百分比與視覺參數
+      // --- 視覺參數 ---
       const balancePercentage = Math.min(Math.max((balance / MAX_CAPACITY) * 100, 0), 100);
       const isLowWater = balance < WARNING_LIMIT;
       const warningLinePosition = (WARNING_LIMIT / MAX_CAPACITY) * 100;
@@ -82,99 +83,130 @@
         await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'add', items }) });
         alert(`成功同步 ${items.length} 筆資料至雲端！`);
         setStagingList([]);
-        refreshDataFromServer(); // 送出後自動更新水位
+        refreshDataFromServer();
       };
 
       const handleRecall = async (itemToRecall) => {
-        if(!confirm(`確定要撤回「${itemToRecall.item}」嗎？此操作將永久刪除該筆雲端紀錄。`)) return;
+        if(!confirm(`確定要撤回「${itemToRecall.item}」嗎？`)) return;
         setIsLoading(true);
         await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', uuid: itemToRecall.uuid }) });
         alert('撤回成功！');
-        refreshDataFromServer(); // 撤回後自動更新水位
+        refreshDataFromServer();
       };
 
-      // 💡 補回漏掉的撤回時間判斷函數！(5分鐘內才可撤回)
       const canRecall = (ts) => {
         if (!ts) return false;
         return (new Date().getTime() - ts) / 1000 / 60 <= 5;
       };
 
-      // --- 介面渲染結構 ---
-      return e('div', { className: 'max-w-xl mx-auto p-4 pb-20' },
-        isLoading && e('div', { className: 'fixed inset-0 bg-white/80 z-50 flex items-center justify-center font-bold text-blue-600 animate-pulse' }, '🔄 同步雲端資料中...'),
-        
-        // 1. 擬真水庫水情圖表
-        e('div', { className: 'bg-white p-6 rounded-3xl shadow-xl mb-4 border-2 border-blue-100' },
-          e('h1', { className: 'text-center font-bold text-slate-600 mb-6 flex items-center justify-center gap-2' }, 
-            e('span', { className: 'text-2xl' }, '💧'), '家用公款即時水情'
-          ),
-          
-          e('div', { className: 'flex gap-6 items-start' },
-            // 左側數值欄
-            e('div', { className: 'flex-1 space-y-3 pt-2' },
-              e('div', { className: 'text-left' }, e('p', {className: 'text-xs text-slate-400'}, '總容量 (滿水位)'), e('p', {className: 'text-sm font-bold'}, `$${MAX_CAPACITY.toLocaleString()}`)),
-              e('div', { className: 'text-left border-l-4 border-rose-400 pl-2' }, e('p', {className: 'text-xs text-rose-500 font-medium'}, '低水位警告線'), e('p', {className: 'text-sm font-bold text-rose-600'}, `$${WARNING_LIMIT.toLocaleString()}`)),
-              e('div', { className: 'text-left bg-blue-50 p-2 rounded-lg' }, e('p', {className: 'text-xs text-blue-500 font-medium'}, '當前蓄水量 (餘額)'), e('p', {className: 'text-3xl font-black text-blue-700 mt-1'}, `$${balance.toLocaleString()}`))
-            ),
-            
-            // 右側視覺水位柱
-            e('div', { className: 'w-24 flex flex-col items-center' },
-              e('div', { className: 'relative w-16 h-48 bg-slate-200 rounded-lg overflow-hidden border-4 border-slate-300 shadow-inner' },
-                // 紅色警告線
-                e('div', { className: 'absolute left-0 right-0 h-1 bg-rose-500 z-10', style: { bottom: `${warningLinePosition}%` } }),
-                // 藍色水位
-                e('div', { className: 'absolute bottom-0 left-0 right-0 bg-blue-500 transition-all duration-500 ease-out', style: { height: `${balancePercentage}%` } }),
-                // 波紋效果 (選配CSS)
-                e('div', { className: 'absolute left-0 right-0 h-2 bg-blue-400 opacity-50', style: { bottom: `${balancePercentage - 1}%` } })
-              ),
-              e('p', { className: `mt-2 text-xl font-black ${isLowWater ? 'text-rose-600' : 'text-blue-600'}` }, `${balancePercentage.toFixed(1)}%`)
-            )
-          ),
-          
-          // 下方本期統計
-          e('div', { className: 'flex justify-between px-4 mt-6 pt-4 border-t border-slate-100' },
-            e('div', { className: 'text-center' }, e('p', {className: 'text-xs text-slate-400'}, '本期合計存入'), e('p', {className: 'text-xl font-bold text-emerald-600'}, `+$${totalIncome.toLocaleString()}`)),
-            e('div', { className: 'text-center' }, e('p', {className: 'text-xs text-slate-400'}, '本期合計支出'), e('p', {className: 'text-xl font-bold text-rose-600'}, `-$${totalExpense.toLocaleString()}`))
+      // --- 響應式介面渲染 ---
+      return e('div', { className: 'max-w-6xl mx-auto p-4 md:p-6 lg:p-8 pb-24' },
+        // 載入中遮罩
+        isLoading && e('div', { className: 'fixed inset-0 bg-white/90 z-50 flex items-center justify-center' }, 
+          e('div', {className: 'flex flex-col items-center'}, 
+             e('div', {className: 'w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4'}),
+             e('span', {className: 'font-bold text-blue-800 text-lg'}, '與雲端對帳中...')
           )
         ),
-
-        // 2. 帳目輸入區
-        e('div', { className: 'bg-white p-5 rounded-2xl shadow-lg border' },
-          e('div', { className: 'flex bg-slate-100 rounded-xl p-1 mb-4' },
-            e('button', { onClick: () => setType('expense'), className: `flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${type === 'expense' ? 'bg-white text-rose-600 shadow' : 'text-slate-500'}` }, '支 出'),
-            e('button', { onClick: () => setType('income'), className: `flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${type === 'income' ? 'bg-white text-emerald-600 shadow' : 'text-slate-500'}` }, '存 入')
+        
+        // 頁首標題
+        e('header', { className: 'mb-6 text-center md:text-left border-b border-slate-200 pb-4' },
+          e('h1', { className: 'text-2xl md:text-3xl font-black text-slate-800 flex items-center justify-center md:justify-start gap-2' }, 
+            '💧', '公款家用記帳系統'
           ),
-          e('input', { type: 'date', className: 'w-full border border-slate-200 p-3 mb-3 rounded-xl bg-slate-50', value: date, onChange: (ev) => setDate(ev.target.value) }),
-          e('div', { className: 'flex gap-2' },
-            e('input', { className: 'flex-1 border border-slate-200 p-3 rounded-xl', placeholder: '項目名稱', value: item, onChange: (ev) => setItem(ev.target.value) }),
-            e('input', { className: 'w-28 border border-slate-200 p-3 rounded-xl font-semibold', type: 'number', placeholder: '金額', value: amount, onChange: (ev) => setAmount(ev.target.value) })
-          ),
-          e('button', { className: 'w-full bg-slate-800 text-white mt-4 py-3 rounded-xl font-bold hover:bg-slate-700 transition active:scale-95', onClick: handleAddStaging }, '加入暫存清單')
+          e('p', { className: 'text-sm text-slate-500 mt-2' }, '響應式介面：自動適應手機與電腦版面')
         ),
+        
+        // 🌟 網格佈局 (手機: 單排上下 / 電腦: 雙排左右)
+        e('div', { className: 'grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8' },
+          
+          // --- 左側 (或上方)：水情與輸入區 ---
+          e('div', { className: 'lg:col-span-1 space-y-6' },
+            
+            // 1. 水情儀表板
+            e('div', { className: 'bg-white p-6 rounded-3xl shadow-md border-2 border-blue-100' },
+              e('h2', { className: 'font-bold text-slate-700 mb-4 flex items-center gap-2' }, '📊 即時帳戶水情'),
+              e('div', { className: 'flex justify-between items-center' },
+                e('div', { className: 'space-y-4' },
+                  e('div', null, e('p', {className: 'text-xs text-slate-400'}, '總容量'), e('p', {className: 'text-sm font-bold'}, `$${MAX_CAPACITY.toLocaleString()}`)),
+                  e('div', {className: 'border-l-4 border-rose-400 pl-2'}, e('p', {className: 'text-xs text-rose-500'}, '警告線'), e('p', {className: 'text-sm font-bold text-rose-600'}, `$${WARNING_LIMIT.toLocaleString()}`)),
+                  e('div', {className: 'bg-blue-50 p-2 rounded-lg'}, e('p', {className: 'text-xs text-blue-600'}, '當前結餘'), e('p', {className: 'text-2xl font-black text-blue-700'}, `$${balance.toLocaleString()}`))
+                ),
+                // 視覺水庫
+                e('div', { className: 'w-20 flex flex-col items-center' },
+                  e('div', { className: 'relative w-12 h-40 bg-slate-100 rounded-lg overflow-hidden border-4 border-slate-300' },
+                    e('div', { className: 'absolute left-0 right-0 h-1 bg-rose-500 z-10', style: { bottom: `${warningLinePosition}%` } }),
+                    e('div', { className: 'absolute bottom-0 left-0 right-0 bg-blue-500 transition-all duration-700', style: { height: `${balancePercentage}%` } })
+                  ),
+                  e('p', { className: `mt-2 text-lg font-black ${isLowWater ? 'text-rose-600' : 'text-blue-600'}` }, `${balancePercentage.toFixed(0)}%`)
+                )
+              ),
+              // 本期合計
+              e('div', { className: 'grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-slate-100' },
+                e('div', { className: 'text-center bg-emerald-50 rounded p-2' }, e('p', {className: 'text-xs text-emerald-600'}, '本期存入'), e('p', {className: 'font-bold text-emerald-700'}, `+$${totalIncome.toLocaleString()}`)),
+                e('div', { className: 'text-center bg-rose-50 rounded p-2' }, e('p', {className: 'text-xs text-rose-600'}, '本期支出'), e('p', {className: 'font-bold text-rose-700'}, `-$${totalExpense.toLocaleString()}`))
+              )
+            ),
 
-        // 3. 暫存待送區
-        stagingList.length > 0 && e('div', { className: 'bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 mt-4 shadow-inner' },
-          e('div', {className: 'flex justify-between items-center mb-3'}, 
-            e('h3', { className: 'font-bold text-amber-900' }, `🛒 暫存待送出 (${stagingList.length}筆)`),
-            e('button', { className: 'bg-blue-600 text-white text-sm px-4 py-2 rounded-lg font-bold animate-pulse', onClick: handleSubmit }, '確認同步送出')
-          ),
-          stagingList.map(d => e('div', { key: d.id, className: 'flex justify-between border-b border-amber-100 py-2 text-sm' },
-            e('div', null, e('span', {className: `text-xs px-1.5 py-0.5 rounded mr-2 ${d.type==='income'?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`},d.type==='income'?'存':'支'), e('span', {className: 'text-slate-700'}, d.item)),
-            e('div', null, e('span', {className: 'font-bold text-slate-900 mr-2'}, `$${d.amount}`), e('button', {className:'text-rose-400 text-xs', onClick: ()=>setStagingList(stagingList.filter(s=>s.id!==d.id))}, '✖'))
-          ))
-        ),
-
-        // 4. 近期雲端明細
-        e('div', { className: 'bg-white rounded-2xl p-5 mt-4 border' },
-          e('h3', { className: 'font-bold text-slate-600 mb-4' }, '📜 近期雲端存取紀錄 (最近10筆)'),
-          cloudList.length === 0 ? e('p', {className: 'text-center text-slate-400 py-6 text-sm'}, '尚無紀錄，點擊上方送出資料') : 
-          cloudList.map(data => e('div', { key: data.uuid, className: 'flex justify-between items-center border-b border-slate-100 py-3 text-sm' },
-            e('div', null, e('p', {className: 'text-xs text-slate-400'}, `${data.date} ${data.timestampStr||''}`), e('p', {className:'font-medium text-slate-700 mt-1'}, data.item)),
-            e('div', {className: 'flex items-center gap-2.5'}, 
-              e('span', {className: `text-lg font-bold ${data.type === 'expense' ? 'text-rose-500' : 'text-emerald-500'}`}, (data.type === 'expense' ? '-' : '+') + '$' + data.amount.toLocaleString()),
-              canRecall(data.timestamp) ? e('button', { className: 'text-xs text-rose-500 bg-rose-50 px-2.5 py-1 rounded hover:bg-rose-100', onClick: () => handleRecall(data) }, '撤回') : null
+            // 2. 輸入區
+            e('div', { className: 'bg-white p-5 rounded-3xl shadow-sm border border-slate-200' },
+              e('div', { className: 'flex bg-slate-100 rounded-xl p-1 mb-4' },
+                e('button', { onClick: () => setType('expense'), className: `flex-1 py-3 md:py-2 text-sm font-bold rounded-lg ${type === 'expense' ? 'bg-white text-rose-600 shadow' : 'text-slate-500'}` }, '支 出'),
+                e('button', { onClick: () => setType('income'), className: `flex-1 py-3 md:py-2 text-sm font-bold rounded-lg ${type === 'income' ? 'bg-white text-emerald-600 shadow' : 'text-slate-500'}` }, '存 入')
+              ),
+              e('input', { type: 'date', className: 'w-full border border-slate-200 p-3 mb-3 rounded-xl bg-slate-50', value: date, onChange: (ev) => setDate(ev.target.value) }),
+              e('div', { className: 'flex gap-2' },
+                e('input', { className: 'flex-1 border border-slate-200 p-3 rounded-xl min-w-0', placeholder: '項目', value: item, onChange: (ev) => setItem(ev.target.value) }),
+                e('input', { className: 'w-24 md:w-28 border border-slate-200 p-3 rounded-xl font-semibold text-center', type: 'number', placeholder: '金額', value: amount, onChange: (ev) => setAmount(ev.target.value) })
+              ),
+              e('button', { className: 'w-full bg-slate-800 text-white mt-4 py-3.5 rounded-xl font-bold active:bg-slate-700', onClick: handleAddStaging }, '加入暫存')
             )
-          ))
+          ),
+
+          // --- 右側 (或下方)：清單與歷史 ---
+          e('div', { className: 'lg:col-span-2 space-y-6' },
+            
+            // 3. 暫存購物車
+            stagingList.length > 0 && e('div', { className: 'bg-amber-50 border border-amber-200 rounded-3xl p-5 shadow-sm' },
+              e('div', {className: 'flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4'}, 
+                e('h3', { className: 'font-bold text-amber-900 text-lg' }, `🛒 暫存待送出 (${stagingList.length})`),
+                e('button', { className: 'bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-blue-700', onClick: handleSubmit }, '確認同步送出')
+              ),
+              e('div', {className: 'space-y-2'}, 
+                stagingList.map(d => e('div', { key: d.id, className: 'flex justify-between items-center bg-white p-3 rounded-xl border border-amber-100' },
+                  e('div', {className: 'flex items-center min-w-0'}, 
+                    e('span', {className: `text-xs px-2 py-1 rounded-md mr-3 whitespace-nowrap ${d.type==='income'?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}, d.type==='income'?'存':'支'), 
+                    e('span', {className: 'text-slate-700 font-medium truncate'}, d.item)
+                  ),
+                  e('div', {className: 'flex items-center gap-3 ml-2 shrink-0'}, 
+                    e('span', {className: 'font-bold text-slate-900'}, `$${d.amount.toLocaleString()}`), 
+                    e('button', {className:'text-slate-400 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 rounded-full w-8 h-8 flex items-center justify-center font-bold', onClick: ()=>setStagingList(stagingList.filter(s=>s.id!==d.id))}, '✕')
+                  )
+                ))
+              )
+            ),
+
+            // 4. 近期明細 (帶撤回)
+            e('div', { className: 'bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-200' },
+              e('div', {className: 'flex justify-between items-end mb-5 border-b border-slate-100 pb-3'},
+                e('h3', { className: 'font-bold text-slate-700 text-lg' }, '📜 雲端歷史紀錄'),
+                e('span', {className: 'text-xs text-slate-400'}, '僅顯示近10筆，5分鐘內可撤回')
+              ),
+              cloudList.length === 0 ? e('p', {className: 'text-center text-slate-400 py-10'}, '尚無紀錄') : 
+              e('div', {className: 'space-y-1'},
+                cloudList.map(data => e('div', { key: data.uuid, className: 'flex justify-between items-center hover:bg-slate-50 p-3 rounded-xl transition-colors' },
+                  e('div', {className: 'min-w-0 pr-2'}, 
+                    e('p', {className: 'text-xs text-slate-400 mb-0.5'}, `${data.date} ${data.timestampStr||''}`), 
+                    e('p', {className:'font-semibold text-slate-800 truncate'}, data.item)
+                  ),
+                  e('div', {className: 'flex items-center gap-3 shrink-0'}, 
+                    e('span', {className: `text-lg font-bold ${data.type === 'expense' ? 'text-rose-500' : 'text-emerald-500'}`}, (data.type === 'expense' ? '-' : '+') + '$' + data.amount.toLocaleString()),
+                    canRecall(data.timestamp) ? e('button', { className: 'text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg active:bg-rose-200', onClick: () => handleRecall(data) }, '撤回') : e('div', {className: 'w-[46px]'}) // 佔位用，保持對齊
+                  )
+                ))
+              )
+            )
+          )
         )
       );
     }
